@@ -1,12 +1,12 @@
 from esp import neopixel_write
 import machine
-from math import sin, radians
 
 GAMMA = 2.8
 GAMMA_SHIFT = 40
 
+
 class Led(object):
-    def __init__(self, hsv=(0,0,0), rgb=None):
+    def __init__(self, hsv=(0, 0, 0), rgb=None):
         self.set_hsv(0, 0, 0)
 
     def set_hsv(self, *hsv):
@@ -15,7 +15,8 @@ class Led(object):
         self.v = hsv[2]
 
     def to_rgb(self):
-        return hsv_to_rgb_rainbow_compact(self.h, self.s, self.v)
+        return hsv_to_rgb_rainbow_opt(self.h, self.s, self.v)
+
 
 class LedStrip:
     def __init__(self, pin, num_leds):
@@ -46,18 +47,21 @@ class LedStrip:
     def blit(self):
         neopixel_write(self.pin, self._get_buff(), True)
 
-def scale_gamma(val):
-    return round((((val + GAMMA_SHIFT)/(255 + GAMMA_SHIFT)) ** GAMMA) * 255)
 
-def hsv_to_rgb_rainbow_compact(hue, sat, val):
+def scale_gamma(val):
+    return int((((val + GAMMA_SHIFT)/(255 + GAMMA_SHIFT)) ** GAMMA) * 255)
+
+
+def hsv_to_rgb_rainbow_opt(hue, sat, val):
+    """Convert HSV to RGB with constant brightness in rainbow mode."""
     K255 = 255
     K171 = 171
     K170 = 170
-    K85  = 85
+    K85 = 85
 
     offset = hue & 0x1F
     offset8 = offset << 3
-    third = offset8 / 3
+    third = offset8 // 3
     r = g = b = 0
 
     if (hue & 0x80) == 0:
@@ -72,7 +76,7 @@ def hsv_to_rgb_rainbow_compact(hue, sat, val):
                 b = 0
         else:
             if (hue & 0x20) == 0:
-                twothirds = scale8( offset8, ((256 * 2) / 3))
+                twothirds = offset8 * 2 // 3  # 256 * 2 / 3
                 r = K171 - twothirds
                 g = K170 + third
                 b = 0
@@ -84,9 +88,9 @@ def hsv_to_rgb_rainbow_compact(hue, sat, val):
         if (hue & 0x40) == 0:
             if (hue & 0x20) == 0:
                 r = 0
-                twothirds = offset8 * 2 / 3
+                twothirds = offset8 * 2 // 3
                 g = K171 - twothirds
-                b = K85  + twothirds
+                b = K85 + twothirds
             else:
                 r = third
                 g = 0
@@ -105,13 +109,13 @@ def hsv_to_rgb_rainbow_compact(hue, sat, val):
             r = b = g = 255
         else:
             if r:
-                r = scale8(r, sat)
+                r = r * sat >> 8
             if g:
-                g = scale8(g, sat)
+                g = g * sat >> 8
             if b:
-                b = scale8(b, sat)
+                b = b * sat >> 8
             desat = 255 - sat
-            desat = scale8(desat, desat)
+            desat = desat * desat >> 8
             brightness_floor = desat
             r += brightness_floor
             g += brightness_floor
@@ -123,32 +127,10 @@ def hsv_to_rgb_rainbow_compact(hue, sat, val):
             r = g = b = 0
         else:
             if r:
-                r = scale8(r, val)
+                r = r * val >> 8
             if g:
-                g = scale8(g, val)
+                g = g * val >> 8
             if b:
-                b = scale8(b, val)
+                b = b * val >> 8
 
-    return (round(r), round(g), round(b))
-
-def scale8(val, scale):
-    return round(val * scale / 256)
-
-# strip.set_all_leds(192, 255, 0); strip.blit()
-
-def throb():
-    pos = 0
-    d = 1
-    color = 192
-    while True:
-        strip.set_all_leds(color, 255, pos)
-        strip.blit()
-
-        pos += d
-        if pos > 255:
-            pos = 254
-            d = -1
-        elif pos < 0:
-            pos = 1
-            d = 1
-        print(pos)
+    return (r, g, b)
